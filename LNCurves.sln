@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LNCurves", "LNCurves.csproj", "{DFA64895-C48B-4792-A5BA-02A6B3C66728}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DFA64895-C48B-4792-A5BA-02A6B3C66728}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFA64895-C48B-4792-A5BA-02A6B3C66728}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DFA64895-C48B-4792-A5BA-02A6B3C66728}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DFA64895-C48B-4792-A5BA-02A6B3C66728}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
