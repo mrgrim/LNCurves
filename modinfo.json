@@ -5,8 +5,8 @@
   "name": "Landforms Need Curves",
   "authors": [ "MadSeraph" ],
   "description": "Apply cubic easing curves to landforms to alter impact of features.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dependencies": {
-    "game": "1.20.0"
+    "game": "1.22.2"
   }
 }

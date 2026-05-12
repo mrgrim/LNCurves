@@ -20,20 +20,20 @@ public class SavedLandform
 [HarmonyPatch]
 public class LNCurvesMod : ModSystem
 {
-    public static ICoreAPI api;
-    public Harmony harmony;
+    public static ICoreAPI? api;
+    public required Harmony harmony;
     private static double SeaLevelRatio = 22.0 / 51.0;
     public static List<SavedLandform> _savedLandforms = new List<SavedLandform>();
 
-    public override void StartPre(ICoreAPI api)
+    public override void StartPre(ICoreAPI apiIn)
     {
-        LNCurvesMod.api = api;
+        api = apiIn;
         ModConfig.LoadConfig(api);
     }
 
-    public override void Start(ICoreAPI api)
+    public override void Start(ICoreAPI apiIn)
     {
-        LNCurvesMod.api = api;
+        api = apiIn;
         
         if (api.Side != EnumAppSide.Server) return;
         
@@ -58,8 +58,8 @@ public class LNCurvesMod : ModSystem
             sea_curve = new CubicBezierEasing(ModConfig.Instance.DefaultSeaCurveControlPoints);
         }
 
-        api.Logger.Event("Applying curves to landform " + landform.Code.Path+ ".");
-        api.Logger.Event("Starting Y Key Positions: [" + String.Join(", ", landform.TerrainYKeyPositions) + "].");
+        api?.Logger.Event("Applying curves to landform " + landform.Code.Path+ ".");
+        api?.Logger.Event("Starting Y Key Positions: [" + String.Join(", ", landform.TerrainYKeyPositions) + "].");
 
         for (int pos_index = 0; pos_index < landform.TerrainYKeyPositions.Length; pos_index++)
         {
@@ -81,7 +81,7 @@ public class LNCurvesMod : ModSystem
             }
         }
         
-        api.Logger.Event("Adjusted Y Key Positions: [" + String.Join(", ", landform.TerrainYKeyPositions) + "].");
+        api?.Logger.Event("Adjusted Y Key Positions: [" + String.Join(", ", landform.TerrainYKeyPositions) + "].");
     }
     
     [HarmonyPatch(typeof(LandformVariant), "Init")]
@@ -99,7 +99,7 @@ public class LNCurvesMod : ModSystem
                 }
             }
             
-            _savedLandforms.Add(new SavedLandform(__instance, __instance.TerrainYKeyPositions.Clone() as float[]));
+            _savedLandforms.Add(new SavedLandform(__instance, __instance.TerrainYKeyPositions.Clone() as float[] ?? []));
             
             ApplyCurveToLandform(__instance);
         }

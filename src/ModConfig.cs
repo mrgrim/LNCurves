@@ -74,28 +74,13 @@ public class LandformOverride
 
     [DisplayName("Landform Code Name")]
     [Description("The name of the \"code\" property for the landform in worldgen\\landforms.json")]
-    public string codeName
-    {
-        get => _codeName;
-        set => _codeName = value;
-    }
-    private string _codeName;
+    public required string codeName { get; set; }
 
     [DisplayName("Above Sea Level Curve Control Points")]
-    public CurvePoints landCurve
-    {
-        get => _landCurve;
-        set => _landCurve = value;
-    }
-    private CurvePoints _landCurve;
+    public CurvePoints landCurve { get; set; }
 
     [DisplayName("Below Sea Level Curve Control Points")]
-    public CurvePoints seaCurve
-    {
-        get => _seaCurve;
-        set => _seaCurve = value;
-    }
-    private CurvePoints _seaCurve;
+    public CurvePoints seaCurve { get; set; }
 }
 
 class ModConfig
@@ -126,32 +111,40 @@ class ModConfig
     [DisplayName("Apply Changes")]
     public static void ApplyChanges()
     {
-        // Not that autoconfiglib eats exceptions...
+        // Note that autoconfiglib eats exceptions...
+
+        if (LNCurvesMod.api is null)
+            return; // Shouldn't happen, and our logging engine to report the error is in there. Also see above re exceptions.
         
-        LNCurvesMod.api.Logger.Event("Applying changes");
+        LNCurvesMod.api?.Logger.Event("Applying changes");
         
-        MethodInfo lerpThresholds = typeof(LandformVariant).GetMethod("LerpThresholds", BindingFlags.NonPublic | BindingFlags.Instance);
+        var lerpThresholds = typeof(LandformVariant).GetMethod("LerpThresholds", BindingFlags.NonPublic | BindingFlags.Instance);
+        var genTerraLandforms = typeof(GenTerra).GetField("landforms", BindingFlags.NonPublic | BindingFlags.Instance);
         
-        for (int landformIndex = 0; landformIndex < LNCurvesMod._savedLandforms.Count; landformIndex++)
+        if (lerpThresholds is null || genTerraLandforms is null)
         {
-            var landform = LNCurvesMod._savedLandforms[landformIndex];
+            LNCurvesMod.api?.Logger.Error("Failed obtaining reflection objects.");
+            return;
+        }
+
+        foreach (var landform in LNCurvesMod._savedLandforms)
+        {
             landform.OriginalYKeyPositions.CopyTo(landform.Landform.TerrainYKeyPositions, 0);
             
             LNCurvesMod.ApplyCurveToLandform(landform.Landform);
             lerpThresholds.Invoke(landform.Landform,
-                new object[] { ((ICoreServerAPI)(LNCurvesMod.api)).WorldManager.MapSizeY });
+                [((ICoreServerAPI?)LNCurvesMod.api)?.WorldManager.MapSizeY]);
         }
 
         // Force recopying of lerped thresholds in GenTerra
         try
         {
-            GenTerra genTerraMod = LNCurvesMod.api.ModLoader.GetModSystem<GenTerra>();
-            FieldInfo genTerraLandforms = typeof(GenTerra).GetField("landforms", BindingFlags.NonPublic | BindingFlags.Instance);
+            var genTerraMod = LNCurvesMod.api?.ModLoader.GetModSystem<GenTerra>();
             genTerraLandforms.SetValue(genTerraMod, null);
         }
         catch (Exception e)
         {
-            LNCurvesMod.api.Logger.Error("Failed to reset GenTerra lerped thresholds: " + e.Message);
+            LNCurvesMod.api?.Logger.Error("Failed to reset GenTerra lerped thresholds: " + e.Message);
         }
     }
 
