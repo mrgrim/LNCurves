@@ -85,7 +85,8 @@ public class LandformOverride
 
 class ModConfig
 {
-    public static ModConfig Instance { get; set; } = new ModConfig();
+    public const int CurrentSchemaVersion = 2;
+    public static ModConfig Instance { get; set; } = new ();
 
     public static void LoadConfig(ICoreAPI api)
     {
@@ -94,19 +95,41 @@ class ModConfig
             ModConfig file;
             if ((file = api.LoadModConfig<ModConfig>("LNCurves.json")) == null)
             {
-                api.StoreModConfig<ModConfig>(ModConfig.Instance, "LNCurves.json");
+                Instance.Version = CurrentSchemaVersion;
+                api.StoreModConfig(Instance, "LNCurves.json");
             }
             else
             {
-                ModConfig.Instance = file;
+                Instance = file;
+                if (Migrate(api)) api.StoreModConfig(Instance, "LNCurves.json");
             }
         }
         catch
         {
-            api.StoreModConfig<ModConfig>(ModConfig.Instance, "LNCurves.json");
+            api.StoreModConfig(Instance, "LNCurves.json");
         }
     }
 
+    private static bool Migrate(ICoreAPI? api)
+    {
+        var changed = false;
+        var from = Instance.Version;
+
+        if (from < 2)
+        {
+            Instance.SmoothingRadius = 0;
+            api?.Logger.Event("LNCurves: migrated config from v" + from + " to v2 (SmoothingRadius set to 0 for compatibility " +
+                              "with existing worlds; set it manually to enable slope smoothing to help with floating dirt and air " +
+                              "gap artifacts. Recommend a value of 2 for 256 height worlds, increase for taller worlds).");
+            changed = true;
+        }
+
+        if (Instance.Version == CurrentSchemaVersion) return changed;
+        
+        Instance.Version = CurrentSchemaVersion;
+        return true;
+    }
+    
     [Browsable(true)]
     [DisplayName("Apply Changes")]
     public static void ApplyChanges()
@@ -134,6 +157,8 @@ class ModConfig
             LNCurvesMod.ApplyCurveToLandform(landform.Landform);
             lerpThresholds.Invoke(landform.Landform,
                 [((ICoreServerAPI?)LNCurvesMod.api)?.WorldManager.MapSizeY]);
+
+            LNCurvesMod.SmoothLandformThresholds(landform.Landform);
         }
 
         // Force recopying of lerped thresholds in GenTerra
@@ -153,5 +178,21 @@ class ModConfig
     [DisplayName("Default Below Sea Level Curve Control Points")]
     public CurvePoints DefaultSeaCurveControlPoints { get; set; } = new CurvePoints(0, 0, 1, 1);
 
-    public Dictionary<string, LandformOverride> LandformOverrides { get; set; } = new Dictionary<string, LandformOverride>();
+    [DisplayName("Threshold Smoothing Radius")]
+    [Description(
+        "Radius (in Y-blocks) of the symmetric box blur applied to each landform's per-block-Y threshold profile after the bezier remap. " +
+        "Smooths out steep threshold slopes that would otherwise cause occasional floating-dirt artifacts. " +
+        "0 disables smoothing. Calibrated for a world height of 256; raise proportionally for taller worlds. Typical range 0-8.")]
+    [Range(0, 16)]
+    [DefaultValue(2)]
+    public int SmoothingRadius
+    {
+        get;
+        set => field = Math.Clamp(value, 0, 16);
+    } = 2;
+
+    [Browsable(false)]
+    public int Version { get; set; }
+
+    public Dictionary<string, LandformOverride> LandformOverrides { get; set; } = new ();
 }

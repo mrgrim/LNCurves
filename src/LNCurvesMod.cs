@@ -84,6 +84,54 @@ public class LNCurvesMod : ModSystem
         api?.Logger.Event("Adjusted Y Key Positions: [" + String.Join(", ", landform.TerrainYKeyPositions) + "].");
     }
     
+    // Applies a symmetric box-blur low-pass filter to the landform's per-block-Y threshold
+    // profile in place. This softens locally-steep segments produced by the bezier remap of
+    // TerrainYKeyPositions, which would otherwise shrink GenTerra's noise-decided band enough
+    // to occasionally produce isolated floating solid blocks (and the dirt-air-stone artifact
+    // the soil-deposition pass then builds on top of them).
+    //
+    // Kernel radius is taken from ModConfig.SmoothingRadius and is measured in Y-blocks
+    // (absolute, not fraction-of-mapsizeY), since the noise oscillation the kernel must mask
+    // is anchored to absolute Y as well. Edges are clamp-padded.
+    public static void SmoothLandformThresholds(LandformVariant landform)
+    {
+        var thresholds = landform.TerrainYThresholds;
+        if (thresholds == null || thresholds.Length == 0) return;
+
+        var radius = ModConfig.Instance.SmoothingRadius;
+        if (radius <= 0) return;
+
+        var n = thresholds.Length;
+        var window = 2 * radius + 1;
+
+        // Running-sum box blur with clamp padding. One scratch alloc per landform variant
+        var result = new float[n];
+
+        // Seed the running sum with the leftmost window (positions -radius..+radius), clamped.
+        var sum = 0.0;
+        for (var k = -radius; k <= radius; k++)
+        {
+            var idx = k < 0 ? 0 : (k >= n ? n - 1 : k);
+            sum += thresholds[idx];
+        }
+        result[0] = (float)(sum / window);
+
+        for (var i = 1; i < n; i++)
+        {
+            var outgoing = i - radius - 1;
+            var incoming = i + radius;
+            var outIdx = outgoing < 0 ? 0 : (outgoing >= n ? n - 1 : outgoing);
+            var inIdx = incoming < 0 ? 0 : (incoming >= n ? n - 1 : incoming);
+            
+            sum += thresholds[inIdx] - thresholds[outIdx];
+            result[i] = (float)(sum / window);
+        }
+
+        // Write back in place so GenTerra's cached references (which point at this same
+        // array) see the smoothed values without needing cache invalidation.
+        Array.Copy(result, thresholds, n);
+    }
+        
     [HarmonyPatch(typeof(LandformVariant), "Init")]
     class LandformVariantInitPatch
     {
@@ -102,6 +150,15 @@ public class LNCurvesMod : ModSystem
             _savedLandforms.Add(new SavedLandform(__instance, __instance.TerrainYKeyPositions.Clone() as float[] ?? []));
             
             ApplyCurveToLandform(__instance);
+        }
+        
+        static void Postfix(LandformVariant __instance)
+        {
+            // Runs after vanilla Init -> LerpThresholds has populated __instance.TerrainYThresholds.
+            // Fires once per parent variant and once per mutation (NoiseLandforms.LoadLandforms
+            // calls Init on each mutation independently), so every variant's distinct threshold
+            // array gets smoothed without a special mutation loop.
+            SmoothLandformThresholds(__instance);
         }
     }
 }
